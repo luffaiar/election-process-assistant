@@ -1,8 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 from deep_translator import GoogleTranslator
-from gtts import gTTS
-import tempfile
+import wikipedia
 import time
 
 # ---------------- GEMINI ----------------
@@ -13,12 +12,10 @@ model = genai.GenerativeModel("gemini-pro")
 st.set_page_config(page_title="Election Assistant GPT", layout="wide")
 
 st.title("🗳 Election Assistant GPT")
-st.caption("🇮🇳 Smart AI for voter awareness")
+st.caption("🇮🇳 Smart AI for Election & Political Awareness")
 
 # ---------------- SIDEBAR ----------------
-st.sidebar.title("📂 Navigation")
-
-page = st.sidebar.radio("Go to", ["💬 Chat", "📜 History"])
+st.sidebar.title("⚙️ Settings")
 
 user_type = st.sidebar.selectbox(
     "👤 Category",
@@ -27,11 +24,11 @@ user_type = st.sidebar.selectbox(
 
 language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
 
-# ---------------- SESSION STORAGE ----------------
+# ---------------- SESSION ----------------
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
-# ---------------- TRANSLATE ----------------
+# ---------------- TRANSLATION ----------------
 def translate_text(text):
     try:
         if language == "Tamil":
@@ -40,16 +37,6 @@ def translate_text(text):
     except:
         return text
 
-# ---------------- VOICE (Tamil Output) ----------------
-def speak_tamil(text):
-    try:
-        tts = gTTS(text=text, lang='ta')
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-            tts.save(fp.name)
-            return fp.name
-    except:
-        return None
-
 # ---------------- SMART RESPONSES ----------------
 def smart_response(q):
     q = q.lower()
@@ -57,39 +44,119 @@ def smart_response(q):
     if "document" in q or "id" in q:
         return "📄 Documents: Aadhaar, Voter ID, Passport, Address Proof"
 
-    elif "process" in q or "vote" in q:
-        return "🗳 Voting: Check list → Go booth → Verify ID → Vote"
+    if "process" in q and "vote" in q:
+        return """🗳 Voting Process:
+1. Check voter list
+2. Visit polling booth
+3. Verify identity
+4. Cast vote"""
 
-    elif "eligibility" in q:
+    if "eligibility" in q:
         return "🧾 Must be 18+ and registered voter"
 
-    elif "senior" in q:
-        return "👴 Seniors get priority, assistance & postal ballot option"
-
-    elif "register" in q:
+    if "register" in q:
         return "📝 Register at https://www.nvsp.in using Form 6"
 
-    elif "election" in q:
-        return "🗳 Election is the process of choosing leaders by voting"
+    if "election" in q:
+        return "🗳 Election is a process where people choose their leaders by voting"
 
     return None
 
-# ---------------- AI ----------------
+# ---------------- VOTER ID PROCESS ----------------
+def voter_id_process(q):
+    q = q.lower()
+
+    if "voter id process" in q or "apply voter id" in q:
+        return """📝 Step-by-Step Voter ID Registration:
+
+1️⃣ Visit https://www.nvsp.in  
+2️⃣ Select 'New Voter Registration' (Form 6)  
+3️⃣ Fill personal details  
+4️⃣ Upload ID & address proof  
+5️⃣ Submit application  
+6️⃣ Track status online  
+7️⃣ Receive voter ID  
+
+💡 Ensure details match official documents."""
+
+    return None
+
+# ---------------- CM DETECTION ----------------
+def get_cm_info(q):
+    q = q.lower()
+
+    cm_data = {
+        "tamil nadu": "M.K. Stalin",
+        "kerala": "Pinarayi Vijayan",
+        "karnataka": "Siddaramaiah",
+        "andhra pradesh": "N. Chandrababu Naidu",
+        "telangana": "Revanth Reddy",
+        "maharashtra": "Eknath Shinde",
+        "uttar pradesh": "Yogi Adityanath"
+    }
+
+    for state in cm_data:
+        if state in q:
+            return f"🏛 Chief Minister of {state.title()}: {cm_data[state]}"
+
+    return None
+
+# ---------------- POLITICAL KNOWLEDGE ----------------
+def political_knowledge(q):
+    q = q.lower()
+
+    if "prime minister" in q or "pm of india" in q:
+        return "🇮🇳 Prime Minister of India: Narendra Modi"
+
+    if "nda" in q:
+        return "🟠 NDA: BJP-led ruling alliance."
+
+    if "india alliance" in q:
+        return "🔵 INDIA Alliance: Opposition coalition."
+
+    return None
+
+# ---------------- PARTY TABLE ----------------
+def party_comparison(q):
+    q = q.lower()
+
+    if "nda vs india" in q or "party comparison" in q:
+        return {
+            "table": True,
+            "data": [
+                ["Alliance", "Leader", "Type"],
+                ["NDA", "BJP-led", "Ruling"],
+                ["INDIA", "Opposition Parties", "Opposition"]
+            ]
+        }
+
+    return None
+
+# ---------------- WEB SEARCH ----------------
+def web_search_answer(query):
+    try:
+        summary = wikipedia.summary(query, sentences=2)
+        return f"🌐 From Web:\n{summary}"
+    except:
+        return None
+
+# ---------------- AI RESPONSE ----------------
 def get_ai_response(user_input):
 
-    # Step 1: Smart answer
-    smart = smart_response(user_input)
-    if smart:
-        return smart
+    # 1️⃣ Rule-based system
+    for func in [smart_response, voter_id_process, get_cm_info, political_knowledge, party_comparison]:
+        result = func(user_input)
+        if result:
+            return result
 
-    # Step 2: Gemini
+    # 2️⃣ Gemini AI
     try:
         prompt = f"""
-        You are Election Assistant GPT.
+        You are an Election Assistant GPT.
 
-        User Type: {user_type}
+        User Category: {user_type}
 
-        Give clear and useful answer.
+        Give clear and helpful answers.
 
         Question: {user_input}
         """
@@ -100,79 +167,59 @@ def get_ai_response(user_input):
     except:
         pass
 
-    return "⚠️ Please ask election-related questions."
+    # 3️⃣ 🌐 Web fallback
+    web = web_search_answer(user_input)
+    if web:
+        return web
 
-# ================= PAGE 1: CHAT =================
-if page == "💬 Chat":
+    return "⚠️ No information found. Try rephrasing your question."
 
-    st.subheader("💡 Quick Questions")
+# ---------------- SUGGESTIONS ----------------
+st.subheader("💡 Suggested Questions")
 
-    col1, col2, col3 = st.columns(3)
+suggestions = [
+    "What documents are needed?",
+    "How to apply voter ID?",
+    "CM of Karnataka?",
+    "NDA vs INDIA",
+    "Who is PM of India?"
+]
 
-    suggestions = [
-        "What documents are needed?",
-        "Voting process",
-        "Eligibility",
-        "How to register?",
-        "Senior citizen voting",
-        "What is election?"
-    ]
+cols = st.columns(3)
+selected = None
 
-    selected = None
-    for i, q in enumerate(suggestions):
-        if st.button(q, key=f"sugg_{i}"):
-            selected = q
+for i, q in enumerate(suggestions):
+    if cols[i % 3].button(q):
+        selected = q
 
-    user_input = st.text_input("💬 Ask your question:")
+# ---------------- INPUT ----------------
+user_input = st.text_input("💬 Ask your question:")
 
-    if selected:
-        user_input = selected
+if selected:
+    user_input = selected
 
-    if user_input:
-        st.session_state.chat.append(("user", user_input))
+# ---------------- RESPONSE ----------------
+if user_input:
+    st.session_state.chat.append(("user", user_input))
 
-        placeholder = st.empty()
-        placeholder.markdown("🤖 Typing...")
+    placeholder = st.empty()
+    placeholder.markdown("🤖 Typing...")
+    time.sleep(1)
 
-        time.sleep(1)
+    response = get_ai_response(user_input)
 
-        response = get_ai_response(user_input)
-        translated = translate_text(response)
+    placeholder.empty()
 
-        placeholder.empty()
+    translated = translate_text(response)
 
-        st.session_state.chat.append(("bot", translated))
+    st.session_state.chat.append(("bot", translated))
 
-        # 🔊 Tamil Voice Output
-        if language == "Tamil":
-            audio_file = speak_tamil(translated)
-            if audio_file:
-                st.audio(audio_file)
-
-    # Display chat
-    for role, msg in st.session_state.chat:
-        if role == "user":
-            st.markdown(f"🧑 **You:** {msg}")
-        else:
-            st.markdown(f"🤖 **Assistant:** {msg}")
-
-# ================= PAGE 2: HISTORY =================
-elif page == "📜 History":
-
-    st.subheader("📜 Previous Questions & Answers")
-
-    if not st.session_state.chat:
-        st.info("No history yet.")
+# ---------------- DISPLAY ----------------
+for role, msg in st.session_state.chat:
+    if role == "user":
+        st.success("👤 " + msg)
     else:
-        for i in range(0, len(st.session_state.chat), 2):
-            try:
-                user_q = st.session_state.chat[i][1]
-                bot_a = st.session_state.chat[i+1][1]
-
-                st.markdown(f"""
-                ### 🧑 {user_q}
-                ➤ 🤖 {bot_a}
-                ---
-                """)
-            except:
-                pass
+        if isinstance(msg, dict) and msg.get("table"):
+            st.table(msg["data"])
+        else:
+            st.info("🤖 " + msg)
