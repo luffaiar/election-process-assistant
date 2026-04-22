@@ -3,8 +3,6 @@ import google.generativeai as genai
 from deep_translator import GoogleTranslator
 import wikipedia
 import time
-from gtts import gTTS
-import tempfile
 
 # ---------------- GEMINI ----------------
 genai.configure(api_key="AIzaSyBTAZG3YTiLzOaz-qT2OHbSwOXIUf5rHqU")
@@ -13,14 +11,12 @@ model = genai.GenerativeModel("gemini-pro")
 # ---------------- UI ----------------
 st.set_page_config(page_title="Election Assistant GPT", layout="wide")
 
-# ---------------- CSS (Responsive + Clean) ----------------
 st.markdown("""
 <style>
 .stApp {
     background: linear-gradient(to bottom, #ffffff, #f5f7fa);
 }
 
-/* Header */
 .header {
     text-align:center;
     padding:12px;
@@ -30,7 +26,6 @@ st.markdown("""
     font-weight:bold;
 }
 
-/* Chat bubbles */
 .user-msg {
     background:#e8f5e9;
     padding:10px;
@@ -49,39 +44,12 @@ st.markdown("""
     text-align:left;
     max-width:80%;
 }
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-    .user-msg, .bot-msg {
-        max-width: 100% !important;
-        font-size: 14px;
-    }
-}
-
-/* Typing dots */
-.typing {
-    display: inline-block;
-}
-.typing span {
-    animation: blink 1.4s infinite both;
-}
-.typing span:nth-child(2) {
-    animation-delay: .2s;
-}
-.typing span:nth-child(3) {
-    animation-delay: .4s;
-}
-@keyframes blink {
-    0% {opacity: .2;}
-    20% {opacity: 1;}
-    100% {opacity: .2;}
-}
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- HEADER ----------------
 st.markdown('<div class="header">🗳 Election Commission Assistant</div>', unsafe_allow_html=True)
-st.caption("🇮🇳 AI for Elections & Indian Politics")
+st.caption("🇮🇳 Detailed Guidance for Elections & Political Awareness")
 
 # ---------------- SETTINGS ----------------
 language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
@@ -102,115 +70,124 @@ def translate_text(text):
     except:
         return text
 
-# ---------------- VOICE OUTPUT ----------------
-def generate_voice(text):
-    try:
-        tts = gTTS(text=text, lang='ta' if language == "Tamil" else 'en')
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-        tts.save(tmp.name)
-        return tmp.name
-    except:
-        return None
-
-# ---------------- SMART RESPONSES ----------------
-def smart_response(q):
+# ---------------- DETAILED KNOWLEDGE ----------------
+def detailed_guidance(q):
     q = q.lower()
 
-    if "document" in q:
-        return "📄 Aadhaar, Voter ID, Passport, Address Proof"
+    if "voter id" in q or "register" in q:
+        return """📝 **Voter ID Registration Process (India)**
 
-    if "voting process" in q:
-        return "🗳 Check list → Visit booth → Verify ID → Vote"
+1. Visit the official portal: https://www.nvsp.in  
+2. Click on “New Voter Registration (Form 6)”  
+3. Enter personal details (Name, DOB, Address)  
+4. Upload required documents:
+   - Identity proof (Aadhaar, Passport)
+   - Address proof  
+5. Submit the application  
+6. Track status using your reference ID  
 
-    if "register" in q:
-        return "📝 Register at https://www.nvsp.in using Form 6"
+📌 Ensure all details are accurate to avoid rejection."""
+
+    if "voting process" in q or "how to vote" in q:
+        return """🗳 **Voting Process in India**
+
+1. Check your name in the voter list  
+2. Visit your assigned polling booth  
+3. Show valid ID for verification  
+4. Receive slip and proceed to voting machine  
+5. Cast your vote using EVM  
+6. Verify VVPAT slip  
+
+📌 Follow instructions from polling officers."""
+
+    if "eligibility" in q:
+        return """🧾 **Eligibility to Vote**
+
+- Must be an Indian citizen  
+- Must be 18 years or older  
+- Must be registered in the voter list  
+- Must have valid identification  
+
+📌 Register early to avoid last-minute issues."""
 
     return None
 
-# ---------------- CM ----------------
-def get_cm_info(q):
-    cm = {
-        "tamil nadu": "M.K. Stalin",
-        "karnataka": "Siddaramaiah"
-    }
-    for state in cm:
-        if state in q.lower():
-            return f"🏛 CM of {state.title()}: {cm[state]}"
-    return None
-
-# ---------------- POLITICAL ----------------
+# ---------------- POLITICAL KNOWLEDGE ----------------
 def political_knowledge(q):
     q = q.lower()
 
     if "prime minister" in q:
-        return "🇮🇳 Narendra Modi is the Prime Minister of India"
+        return """🇮🇳 **Prime Minister of India**
 
-    if "nda" in q:
-        return "🟠 NDA is BJP-led alliance"
+Narendra Modi is the current Prime Minister of India.  
+The Prime Minister is the head of the government and is responsible for decision-making and policy implementation."""
 
-    if "india alliance" in q:
-        return "🔵 INDIA is opposition alliance"
+    if "constitution" in q:
+        return """📜 **Indian Constitution**
+
+The Constitution of India is the supreme law of the country.  
+It defines the structure of government, rights of citizens, and duties of institutions.  
+It came into effect on January 26, 1950."""
 
     return None
 
-# ---------------- WEB ----------------
+# ---------------- WEB SEARCH ----------------
 def web_search(query):
     try:
-        return wikipedia.summary(query, sentences=2)
+        return wikipedia.summary(query, sentences=3)
     except:
         return None
 
-# ---------------- AI ----------------
+# ---------------- AI RESPONSE ----------------
 def get_ai_response(user_input):
 
-    for func in [smart_response, get_cm_info, political_knowledge]:
-        res = func(user_input)
-        if res:
-            return res
+    # Step 1: Detailed guidance
+    detail = detailed_guidance(user_input)
+    if detail:
+        return detail
 
+    # Step 2: Political knowledge
+    political = political_knowledge(user_input)
+    if political:
+        return political
+
+    # Step 3: AI (structured response)
     try:
-        res = model.generate_content(user_input)
+        prompt = f"""
+        You are an official Election Assistant.
+
+        Provide:
+        - Detailed explanation
+        - Step-by-step guidance if applicable
+        - Clear and structured answer
+
+        Question: {user_input}
+        """
+        res = model.generate_content(prompt)
+
         if res and res.text:
             return res.text
     except:
         pass
 
+    # Step 4: Web fallback
     web = web_search(user_input)
     if web:
         return "🌐 " + web
 
-    return "⚠️ Ask election-related questions"
-
-# ---------------- SUGGESTIONS ----------------
-st.subheader("💡 Suggested")
-
-suggestions = ["PM of India?", "CM of Tamil Nadu?", "Voting process"]
-
-cols = st.columns(3)
-selected = None
-
-for i, q in enumerate(suggestions):
-    if cols[i].button(q):
-        selected = q
+    return "⚠️ Please ask election-related questions."
 
 # ---------------- INPUT ----------------
 user_input = st.text_input("💬 Ask your question:")
-
-if selected:
-    user_input = selected
 
 # ---------------- RESPONSE ----------------
 if user_input:
     st.session_state.chat.append(("user", user_input))
 
-    # Typing animation
     placeholder = st.empty()
-    placeholder.markdown(
-        '<div class="bot-msg">🤖 <span class="typing"><span>.</span><span>.</span><span>.</span></span></div>',
-        unsafe_allow_html=True
-    )
+    placeholder.markdown("🤖 Thinking...")
 
-    time.sleep(1.2)
+    time.sleep(1)
 
     response = get_ai_response(user_input)
     translated = translate_text(response)
@@ -224,16 +201,13 @@ if len(st.session_state.chat) > 8:
     st.session_state.chat = st.session_state.chat[-8:]
 
 # ---------------- DISPLAY ----------------
+st.subheader("💬 Conversation")
+
 for role, msg in st.session_state.chat:
     if role == "user":
         st.markdown(f'<div class="user-msg">👤 {msg}</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="bot-msg">🤖 {msg}</div>', unsafe_allow_html=True)
-
-        # Voice button
-        audio = generate_voice(msg)
-        if audio:
-            st.audio(audio)
 
 # ---------------- AUTO SCROLL ----------------
 st.markdown("""
