@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import google.generativeai as genai
 
 # 🔑 Gemini API Key
-genai.configure(api_key="YOUR_GEMINI_API_KEY")
+genai.configure(api_key="AIzaSyBTAZG3YTiLzOaz-qT2OHbSwOXIUf5rHqU")
 
 model = genai.GenerativeModel("gemini-pro")
 
