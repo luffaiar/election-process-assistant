@@ -11,8 +11,58 @@ model = genai.GenerativeModel("gemini-pro")
 # ---------------- UI ----------------
 st.set_page_config(page_title="Election Assistant GPT", layout="wide")
 
-st.title("🗳 Election Assistant GPT")
-st.caption("🇮🇳 Smart AI for Indian Elections & Politics")
+# ---------------- CSS THEME ----------------
+st.markdown("""
+<style>
+.stApp {
+    background: linear-gradient(to bottom, #ffffff, #f5f7fa);
+}
+
+.header {
+    text-align: center;
+    padding: 15px;
+    border-radius: 10px;
+    background: linear-gradient(to right, #ff9933, #ffffff, #138808);
+    font-weight: bold;
+    font-size: 22px;
+    margin-bottom: 10px;
+}
+
+.subheader {
+    text-align: center;
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.user-msg {
+    background-color: #e8f5e9;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 5px;
+    text-align: right;
+}
+
+.bot-msg {
+    background-color: #f1f3f4;
+    padding: 10px;
+    border-radius: 10px;
+    margin: 5px;
+    text-align: left;
+}
+
+.stButton>button {
+    border-radius: 8px;
+    background-color: #ffffff;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ---------------- HEADER ----------------
+st.markdown('<div class="header">🗳 Election Commission Assistant</div>', unsafe_allow_html=True)
+st.markdown('<div class="subheader">🇮🇳 AI for Elections & Indian Politics</div>', unsafe_allow_html=True)
+
+st.info("📌 Official-style assistant for election awareness and political knowledge")
 
 # ---------------- SETTINGS ----------------
 language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
@@ -30,19 +80,19 @@ def translate_text(text):
     except:
         return text
 
-# ---------------- SMART ELECTION RESPONSES ----------------
+# ---------------- SMART RESPONSES ----------------
 def smart_response(q):
     q = q.lower()
 
     if "document" in q or "id" in q:
         return "📄 Documents: Aadhaar, Voter ID, Passport, Address Proof"
 
-    if "voting process" in q or "how to vote" in q:
+    if "voting process" in q:
         return """🗳 Voting Process:
 1. Check voter list
 2. Visit polling booth
 3. Verify identity
-4. Cast vote using EVM"""
+4. Cast vote"""
 
     if "eligibility" in q:
         return "🧾 Must be 18+ and registered voter"
@@ -54,108 +104,91 @@ def smart_response(q):
 
 # ---------------- VOTER ID PROCESS ----------------
 def voter_id_process(q):
-    q = q.lower()
-
-    if "voter id process" in q or "apply voter id" in q:
+    if "voter id process" in q.lower():
         return """📝 Voter ID Registration:
 
-1️⃣ Visit https://www.nvsp.in  
-2️⃣ Select 'New Registration' (Form 6)  
-3️⃣ Fill details  
-4️⃣ Upload documents  
-5️⃣ Submit  
-6️⃣ Track status  
+1. Visit https://www.nvsp.in  
+2. Fill Form 6  
+3. Upload documents  
+4. Submit application  
+5. Track status  
 
-📌 Ensure correct details."""
+✔ Ensure correct details"""
 
     return None
 
-# ---------------- CM DETECTION ----------------
+# ---------------- CM INFO ----------------
 def get_cm_info(q):
     q = q.lower()
-
     cm_data = {
         "tamil nadu": "M.K. Stalin",
         "kerala": "Pinarayi Vijayan",
         "karnataka": "Siddaramaiah",
-        "andhra pradesh": "N. Chandrababu Naidu",
-        "telangana": "Revanth Reddy",
-        "maharashtra": "Eknath Shinde",
         "uttar pradesh": "Yogi Adityanath"
     }
 
     for state in cm_data:
         if state in q:
-            return f"🏛 Chief Minister of {state.title()}: {cm_data[state]}"
-
+            return f"🏛 CM of {state.title()}: {cm_data[state]}"
     return None
 
 # ---------------- POLITICAL KNOWLEDGE ----------------
 def political_knowledge(q):
     q = q.lower()
 
-    if "prime minister" in q or "pm of india" in q:
-        return "🇮🇳 Prime Minister of India: Narendra Modi"
+    if "prime minister" in q:
+        return "🇮🇳 PM of India: Narendra Modi"
 
-    if "president of india" in q:
+    if "president" in q:
         return "🇮🇳 President of India: Droupadi Murmu"
 
     if "nda" in q:
-        return "🟠 NDA (National Democratic Alliance): BJP-led ruling alliance."
+        return "🟠 NDA: BJP-led alliance"
 
     if "india alliance" in q:
-        return "🔵 INDIA Alliance: Coalition of opposition parties."
+        return "🔵 INDIA Alliance: Opposition coalition"
 
     if "constitution" in q:
-        return "📜 The Indian Constitution is the supreme law of India, adopted in 1950."
+        return "📜 Indian Constitution is the supreme law (1950)"
 
     if "election commission" in q:
-        return "🏛 Election Commission of India conducts elections and ensures fairness."
+        return "🏛 Election Commission conducts elections in India"
 
     return None
 
-# ---------------- PARTY COMPARISON ----------------
+# ---------------- PARTY TABLE ----------------
 def party_comparison(q):
-    q = q.lower()
-
-    if "nda vs india" in q or "party comparison" in q:
+    if "nda vs india" in q.lower():
         return {
             "table": True,
             "data": [
-                ["Alliance", "Leader", "Type"],
-                ["NDA", "BJP-led", "Ruling Alliance"],
-                ["INDIA", "Opposition Coalition", "Opposition"]
+                ["Alliance", "Type"],
+                ["NDA", "Ruling"],
+                ["INDIA", "Opposition"]
             ]
         }
-
     return None
 
 # ---------------- WEB SEARCH ----------------
 def web_search_answer(query):
     try:
-        summary = wikipedia.summary(query, sentences=2)
-        return f"🌐 From Web:\n{summary}"
+        return "🌐 " + wikipedia.summary(query, sentences=2)
     except:
         return None
 
 # ---------------- AI RESPONSE ----------------
 def get_ai_response(user_input):
 
-    # Rule-based
     for func in [smart_response, voter_id_process, get_cm_info, political_knowledge, party_comparison]:
-        result = func(user_input)
-        if result:
-            return result
+        res = func(user_input)
+        if res:
+            return res
 
-    # Gemini AI (Enhanced prompt)
     try:
         prompt = f"""
-        You are an expert Election and Indian Politics Assistant.
+        You are an Indian Election Assistant.
 
-        Provide:
-        - Clear explanation
-        - Relevant Indian political context
-        - Avoid repetition
+        Answer clearly and accurately.
 
         Question: {user_input}
         """
@@ -166,12 +199,11 @@ def get_ai_response(user_input):
     except:
         pass
 
-    # Web fallback
     web = web_search_answer(user_input)
     if web:
         return web
 
-    return "⚠️ Please ask election or Indian political related questions."
+    return "⚠️ Please ask election or political questions."
 
 # ---------------- SUGGESTIONS ----------------
 st.subheader("💡 Suggested Questions")
@@ -179,9 +211,9 @@ st.subheader("💡 Suggested Questions")
 suggestions = [
     "Who is PM of India?",
     "CM of Tamil Nadu?",
-    "Explain Indian Constitution",
     "NDA vs INDIA",
-    "How to apply voter ID?"
+    "How to apply voter ID?",
+    "Voting process"
 ]
 
 cols = st.columns(3)
@@ -213,12 +245,21 @@ if user_input:
 
     st.session_state.chat.append(("bot", translated))
 
-# ---------------- DISPLAY ----------------
+# ---------------- CHAT DISPLAY ----------------
+st.subheader("💬 Conversation")
+
 for role, msg in st.session_state.chat:
     if role == "user":
-        st.success("👤 " + msg)
+        st.markdown(f'<div class="user-msg">👤 {msg}</div>', unsafe_allow_html=True)
     else:
         if isinstance(msg, dict) and msg.get("table"):
             st.table(msg["data"])
         else:
-            st.info("🤖 " + msg)
+            st.markdown(f'<div class="bot-msg">🤖 {msg}</div>', unsafe_allow_html=True)
+
+# ---------------- AUTO SCROLL ----------------
+st.markdown("""
+<script>
+window.scrollTo(0, document.body.scrollHeight);
+</script>
+""", unsafe_allow_html=True)
