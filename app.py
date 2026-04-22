@@ -12,16 +12,9 @@ model = genai.GenerativeModel("gemini-pro")
 st.set_page_config(page_title="Election Assistant GPT", layout="wide")
 
 st.title("🗳 Election Assistant GPT")
-st.caption("🇮🇳 Smart AI for Election & Political Awareness")
+st.caption("🇮🇳 Smart AI for Indian Elections & Politics")
 
-# ---------------- SIDEBAR ----------------
-st.sidebar.title("⚙️ Settings")
-
-user_type = st.sidebar.selectbox(
-    "👤 Category",
-    ["General (20–50)", "New Voter (18+)", "Senior Citizen (60+)"]
-)
-
+# ---------------- SETTINGS ----------------
 language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
 
 # ---------------- SESSION ----------------
@@ -37,28 +30,25 @@ def translate_text(text):
     except:
         return text
 
-# ---------------- SMART RESPONSES ----------------
+# ---------------- SMART ELECTION RESPONSES ----------------
 def smart_response(q):
     q = q.lower()
 
     if "document" in q or "id" in q:
         return "📄 Documents: Aadhaar, Voter ID, Passport, Address Proof"
 
-    if "process" in q and "vote" in q:
+    if "voting process" in q or "how to vote" in q:
         return """🗳 Voting Process:
 1. Check voter list
 2. Visit polling booth
 3. Verify identity
-4. Cast vote"""
+4. Cast vote using EVM"""
 
     if "eligibility" in q:
         return "🧾 Must be 18+ and registered voter"
 
     if "register" in q:
         return "📝 Register at https://www.nvsp.in using Form 6"
-
-    if "election" in q:
-        return "🗳 Election is a process where people choose their leaders by voting"
 
     return None
 
@@ -67,17 +57,16 @@ def voter_id_process(q):
     q = q.lower()
 
     if "voter id process" in q or "apply voter id" in q:
-        return """📝 Step-by-Step Voter ID Registration:
+        return """📝 Voter ID Registration:
 
 1️⃣ Visit https://www.nvsp.in  
-2️⃣ Select 'New Voter Registration' (Form 6)  
-3️⃣ Fill personal details  
-4️⃣ Upload ID & address proof  
-5️⃣ Submit application  
-6️⃣ Track status online  
-7️⃣ Receive voter ID  
+2️⃣ Select 'New Registration' (Form 6)  
+3️⃣ Fill details  
+4️⃣ Upload documents  
+5️⃣ Submit  
+6️⃣ Track status  
 
-💡 Ensure details match official documents."""
+📌 Ensure correct details."""
 
     return None
 
@@ -108,15 +97,24 @@ def political_knowledge(q):
     if "prime minister" in q or "pm of india" in q:
         return "🇮🇳 Prime Minister of India: Narendra Modi"
 
+    if "president of india" in q:
+        return "🇮🇳 President of India: Droupadi Murmu"
+
     if "nda" in q:
-        return "🟠 NDA: BJP-led ruling alliance."
+        return "🟠 NDA (National Democratic Alliance): BJP-led ruling alliance."
 
     if "india alliance" in q:
-        return "🔵 INDIA Alliance: Opposition coalition."
+        return "🔵 INDIA Alliance: Coalition of opposition parties."
+
+    if "constitution" in q:
+        return "📜 The Indian Constitution is the supreme law of India, adopted in 1950."
+
+    if "election commission" in q:
+        return "🏛 Election Commission of India conducts elections and ensures fairness."
 
     return None
 
-# ---------------- PARTY TABLE ----------------
+# ---------------- PARTY COMPARISON ----------------
 def party_comparison(q):
     q = q.lower()
 
@@ -125,8 +123,8 @@ def party_comparison(q):
             "table": True,
             "data": [
                 ["Alliance", "Leader", "Type"],
-                ["NDA", "BJP-led", "Ruling"],
-                ["INDIA", "Opposition Parties", "Opposition"]
+                ["NDA", "BJP-led", "Ruling Alliance"],
+                ["INDIA", "Opposition Coalition", "Opposition"]
             ]
         }
 
@@ -143,20 +141,21 @@ def web_search_answer(query):
 # ---------------- AI RESPONSE ----------------
 def get_ai_response(user_input):
 
-    # 1️⃣ Rule-based system
+    # Rule-based
     for func in [smart_response, voter_id_process, get_cm_info, political_knowledge, party_comparison]:
         result = func(user_input)
         if result:
             return result
 
-    # 2️⃣ Gemini AI
+    # Gemini AI (Enhanced prompt)
     try:
         prompt = f"""
-        You are an Election Assistant GPT.
+        You are an expert Election and Indian Politics Assistant.
 
-        User Category: {user_type}
-
-        Give clear and helpful answers.
+        Provide:
+        - Clear explanation
+        - Relevant Indian political context
+        - Avoid repetition
 
         Question: {user_input}
         """
@@ -167,22 +166,22 @@ def get_ai_response(user_input):
     except:
         pass
 
-    # 3️⃣ 🌐 Web fallback
+    # Web fallback
     web = web_search_answer(user_input)
     if web:
         return web
 
-    return "⚠️ No information found. Try rephrasing your question."
+    return "⚠️ Please ask election or Indian political related questions."
 
 # ---------------- SUGGESTIONS ----------------
 st.subheader("💡 Suggested Questions")
 
 suggestions = [
-    "What documents are needed?",
-    "How to apply voter ID?",
-    "CM of Karnataka?",
+    "Who is PM of India?",
+    "CM of Tamil Nadu?",
+    "Explain Indian Constitution",
     "NDA vs INDIA",
-    "Who is PM of India?"
+    "How to apply voter ID?"
 ]
 
 cols = st.columns(3)
