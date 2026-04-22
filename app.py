@@ -1,11 +1,10 @@
 import streamlit as st
 import google.generativeai as genai
 from deep_translator import GoogleTranslator
-import wikipedia
 import time
 
 # ---------------- GEMINI ----------------
-genai.configure(api_key="AIzaSyBTAZG3YTiLzOaz-qT2OHbSwOXIUf5rHqU")
+genai.configure(api_key="YOUR_GEMINI_API_KEY")
 model = genai.GenerativeModel("gemini-pro")
 
 # ---------------- UI ----------------
@@ -49,7 +48,7 @@ st.markdown("""
 
 # ---------------- HEADER ----------------
 st.markdown('<div class="header">🗳 Election Commission Assistant</div>', unsafe_allow_html=True)
-st.caption("🇮🇳 Detailed Guidance for Elections & Political Awareness")
+st.caption("🇮🇳 AI-powered Election Guidance System")
 
 # ---------------- SETTINGS ----------------
 language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
@@ -70,112 +69,32 @@ def translate_text(text):
     except:
         return text
 
-# ---------------- DETAILED KNOWLEDGE ----------------
-def detailed_guidance(q):
-    q = q.lower()
-
-    if "voter id" in q or "register" in q:
-        return """📝 **Voter ID Registration Process (India)**
-
-1. Visit the official portal: https://www.nvsp.in  
-2. Click on “New Voter Registration (Form 6)”  
-3. Enter personal details (Name, DOB, Address)  
-4. Upload required documents:
-   - Identity proof (Aadhaar, Passport)
-   - Address proof  
-5. Submit the application  
-6. Track status using your reference ID  
-
-📌 Ensure all details are accurate to avoid rejection."""
-
-    if "voting process" in q or "how to vote" in q:
-        return """🗳 **Voting Process in India**
-
-1. Check your name in the voter list  
-2. Visit your assigned polling booth  
-3. Show valid ID for verification  
-4. Receive slip and proceed to voting machine  
-5. Cast your vote using EVM  
-6. Verify VVPAT slip  
-
-📌 Follow instructions from polling officers."""
-
-    if "eligibility" in q:
-        return """🧾 **Eligibility to Vote**
-
-- Must be an Indian citizen  
-- Must be 18 years or older  
-- Must be registered in the voter list  
-- Must have valid identification  
-
-📌 Register early to avoid last-minute issues."""
-
-    return None
-
-# ---------------- POLITICAL KNOWLEDGE ----------------
-def political_knowledge(q):
-    q = q.lower()
-
-    if "prime minister" in q:
-        return """🇮🇳 **Prime Minister of India**
-
-Narendra Modi is the current Prime Minister of India.  
-The Prime Minister is the head of the government and is responsible for decision-making and policy implementation."""
-
-    if "constitution" in q:
-        return """📜 **Indian Constitution**
-
-The Constitution of India is the supreme law of the country.  
-It defines the structure of government, rights of citizens, and duties of institutions.  
-It came into effect on January 26, 1950."""
-
-    return None
-
-# ---------------- WEB SEARCH ----------------
-def web_search(query):
-    try:
-        return wikipedia.summary(query, sentences=3)
-    except:
-        return None
-
 # ---------------- AI RESPONSE ----------------
 def get_ai_response(user_input):
 
-    # Step 1: Detailed guidance
-    detail = detailed_guidance(user_input)
-    if detail:
-        return detail
-
-    # Step 2: Political knowledge
-    political = political_knowledge(user_input)
-    if political:
-        return political
-
-    # Step 3: AI (structured response)
     try:
         prompt = f"""
-        You are an official Election Assistant.
+        You are an intelligent assistant.
 
-        Provide:
-        - Detailed explanation
-        - Step-by-step guidance if applicable
-        - Clear and structured answer
+        PRIORITY:
+        - If the question is about elections, give detailed explanation based on Indian election system.
+        - Provide step-by-step guidance when possible.
+        - Keep answers structured and easy to understand.
+
+        You can also answer general questions if asked.
 
         Question: {user_input}
         """
-        res = model.generate_content(prompt)
 
-        if res and res.text:
-            return res.text
+        response = model.generate_content(prompt)
+
+        if response and response.text:
+            return response.text
+
     except:
         pass
 
-    # Step 4: Web fallback
-    web = web_search(user_input)
-    if web:
-        return "🌐 " + web
-
-    return "⚠️ Please ask election-related questions."
+    return "⚠️ Unable to generate response. Please try again."
 
 # ---------------- INPUT ----------------
 user_input = st.text_input("💬 Ask your question:")
@@ -186,7 +105,6 @@ if user_input:
 
     placeholder = st.empty()
     placeholder.markdown("🤖 Thinking...")
-
     time.sleep(1)
 
     response = get_ai_response(user_input)
@@ -196,9 +114,9 @@ if user_input:
 
     st.session_state.chat.append(("bot", translated))
 
-# ---------------- LIMIT HISTORY ----------------
-if len(st.session_state.chat) > 8:
-    st.session_state.chat = st.session_state.chat[-8:]
+# ---------------- LIMIT CHAT ----------------
+if len(st.session_state.chat) > 10:
+    st.session_state.chat = st.session_state.chat[-10:]
 
 # ---------------- DISPLAY ----------------
 st.subheader("💬 Conversation")
