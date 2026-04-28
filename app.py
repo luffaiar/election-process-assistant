@@ -1,135 +1,344 @@
 import streamlit as st
-import google.generativeai as genai
-from deep_translator import GoogleTranslator
+import anthropic
 import time
 
-# ---------------- GEMINI ----------------
-genai.configure(api_key="AIzaSyBTAZG3YTiLzOaz-qT2OHbSwOXIUf5rHqU")
-model = genai.GenerativeModel("gemini-pro")
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(
+    page_title="Election Commission Assistant",
+    page_icon="🗳",
+    layout="wide"
+)
 
-# ---------------- UI ----------------
-st.set_page_config(page_title="Election Assistant GPT", layout="wide")
-
+# ---------------- STYLES ----------------
 st.markdown("""
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap');
+
+* { font-family: 'Sora', sans-serif; }
+
 .stApp {
-    background: linear-gradient(to bottom, #ffffff, #f5f7fa);
+    background: #f8f9fc;
 }
 
-.header {
-    text-align:center;
-    padding:12px;
-    border-radius:10px;
-    background: linear-gradient(to right, #ff9933, #ffffff, #138808);
-    font-size:20px;
-    font-weight:bold;
+.header-box {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: white;
+    border-radius: 14px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    border: 1px solid #e8eaf0;
+}
+
+.header-icon {
+    width: 48px; height: 48px;
+    background: linear-gradient(135deg, #FF6B00, #FF9933);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+}
+
+.header-title {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a2340;
+}
+
+.header-sub {
+    font-size: 13px;
+    color: #888;
+    margin-top: 2px;
+}
+
+.user-msg-wrap {
+    display: flex;
+    justify-content: flex-end;
+    margin: 6px 0;
 }
 
 .user-msg {
-    background:#e8f5e9;
-    padding:10px;
-    border-radius:12px;
-    margin:6px 0;
-    text-align:right;
-    max-width:80%;
-    margin-left:auto;
+    background: #FF6B00;
+    color: white;
+    padding: 10px 16px;
+    border-radius: 16px 16px 4px 16px;
+    max-width: 75%;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.bot-msg-wrap {
+    display: flex;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 10px;
+    margin: 6px 0;
+}
+
+.bot-avatar {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, #FF6B00, #FF9933);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+    flex-shrink: 0;
+    margin-top: 2px;
 }
 
 .bot-msg {
-    background:#f1f3f4;
-    padding:10px;
-    border-radius:12px;
-    margin:6px 0;
-    text-align:left;
-    max-width:80%;
+    background: white;
+    color: #1a2340;
+    padding: 10px 16px;
+    border-radius: 4px 16px 16px 16px;
+    max-width: 75%;
+    font-size: 14px;
+    line-height: 1.6;
+    border: 1px solid #e8eaf0;
+}
+
+.status-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #888;
+    margin-top: 8px;
+}
+
+.status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #138808;
+    display: inline-block;
+}
+
+.chip-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.chip {
+    background: white;
+    border: 1px solid #e8eaf0;
+    border-radius: 20px;
+    padding: 5px 14px;
+    font-size: 12px;
+    color: #555;
+    cursor: pointer;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ---------------- HEADER ----------------
-st.markdown('<div class="header">🗳 Election Commission Assistant</div>', unsafe_allow_html=True)
-st.caption("🇮🇳 AI-powered Election Guidance System")
+st.markdown("""
+<div class="header-box">
+    <div class="header-icon">🗳</div>
+    <div>
+        <div class="header-title">Election Commission Assistant</div>
+        <div class="header-sub">AI-powered guidance for Indian elections &amp; general queries</div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
-# ---------------- SETTINGS ----------------
-language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
+# ---------------- SIDEBAR ----------------
+with st.sidebar:
+    st.markdown("### ⚙️ Settings")
 
-if st.sidebar.button("🗑 Clear Chat"):
-    st.session_state.chat = []
+    api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
 
-# ---------------- SESSION ----------------
-if "chat" not in st.session_state:
-    st.session_state.chat = []
+    language = st.selectbox("🌐 Language", ["English", "Tamil (தமிழ்)"])
 
-# ---------------- TRANSLATION ----------------
-def translate_text(text):
-    try:
-        if language == "Tamil":
-            return GoogleTranslator(source='auto', target='ta').translate(text)
-        return text
-    except:
-        return text
+    st.markdown("---")
+    st.markdown("### 💡 Quick Questions")
+    quick_questions = [
+        "How do I register to vote?",
+        "What is EVM and is it safe?",
+        "What is Model Code of Conduct?",
+        "How are election winners decided?",
+        "What is NOTA?",
+        "How to apply for Voter ID card?",
+        "What is VVPAT?",
+        "Can NRIs vote in Indian elections?",
+    ]
+
+    for q in quick_questions:
+        if st.button(q, use_container_width=True, key=f"chip_{q}"):
+            st.session_state.pending_input = q
+
+    st.markdown("---")
+    if st.button("🗑 Clear Chat", use_container_width=True):
+        st.session_state.chat_history = []
+        st.session_state.api_messages = []
+        st.rerun()
+
+    st.markdown("""
+    <div class="status-bar">
+        <span class="status-dot"></span>
+        Claude AI · Powered by Anthropic
+    </div>
+    """, unsafe_allow_html=True)
+
+# ---------------- SESSION STATE ----------------
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+if "api_messages" not in st.session_state:
+    st.session_state.api_messages = []
+
+if "pending_input" not in st.session_state:
+    st.session_state.pending_input = ""
+
+# ---------------- SYSTEM PROMPT ----------------
+def get_system_prompt(language):
+    lang_instruction = (
+        "IMPORTANT: You MUST respond entirely in Tamil (தமிழ்). Use clear, simple Tamil language throughout."
+        if "Tamil" in language
+        else "Respond in clear, well-structured English."
+    )
+
+    return f"""You are a knowledgeable, friendly assistant specializing in the Indian Election Commission and Indian democracy. {lang_instruction}
+
+Your deep expertise covers:
+- Voter registration (how to register, update details, check status on voterportal.eci.gov.in)
+- Electronic Voting Machines (EVMs) and VVPAT (Voter Verifiable Paper Audit Trail) systems
+- Election schedules, phases, counting, and results
+- Model Code of Conduct (MCC) — rules and enforcement
+- Political parties, candidates, nominations, and campaign rules
+- Lok Sabha and Rajya Sabha elections — differences, terms, seats
+- State Legislative Assembly (Vidhan Sabha) elections
+- Election Commission of India (ECI) — powers, structure, Chief Election Commissioner
+- Voting rights, procedures, and the voting process on election day
+- NOTA (None of the Above) — what it means and implications
+- Postal ballot and proxy voting for NRIs, armed forces, and senior citizens
+- Election laws — Representation of the People Act 1951 & 1950
+- Delimitation of constituencies
+- Election funding, expenditure limits, and affidavit disclosures
+- Booth-level officers, returning officers, and election machinery
+- Election results and dispute resolution (Election Petitions)
+
+You can also answer ANY general knowledge, science, history, current affairs, or everyday question with equal accuracy.
+
+Formatting rules:
+- Use **bold** for key terms and headings
+- Use bullet points for lists
+- Keep answers clear, structured, and appropriately detailed
+- For step-by-step processes, number the steps
+- Be concise but thorough — never vague"""
 
 # ---------------- AI RESPONSE ----------------
-def get_ai_response(user_input):
+def get_ai_response(user_input, api_key, language):
+    if not api_key:
+        return "⚠️ Please enter your Anthropic API key in the sidebar to use this assistant."
 
     try:
-        prompt = f"""
-        You are an intelligent assistant.
+        client = anthropic.Anthropic(api_key=api_key)
 
-        PRIORITY:
-        - If the question is about elections, give detailed explanation based on Indian election system.
-        - Provide step-by-step guidance when possible.
-        - Keep answers structured and easy to understand.
+        # Add user message to API history
+        st.session_state.api_messages.append({
+            "role": "user",
+            "content": user_input
+        })
 
-        You can also answer general questions if asked.
+        # Keep last 20 messages for context
+        messages_to_send = st.session_state.api_messages[-20:]
 
-        Question: {user_input}
-        """
+        response = client.messages.create(
+            model="claude-opus-4-5",
+            max_tokens=1024,
+            system=get_system_prompt(language),
+            messages=messages_to_send
+        )
 
-        response = model.generate_content(prompt)
+        reply = response.content[0].text
 
-        if response and response.text:
-            return response.text
+        # Add assistant reply to API history
+        st.session_state.api_messages.append({
+            "role": "assistant",
+            "content": reply
+        })
 
-    except:
-        pass
+        # Keep API history trimmed
+        if len(st.session_state.api_messages) > 40:
+            st.session_state.api_messages = st.session_state.api_messages[-40:]
 
-    return "⚠️ Unable to generate response. Please try again."
+        return reply
+
+    except anthropic.AuthenticationError:
+        return "⚠️ Invalid API key. Please check your Anthropic API key in the sidebar."
+    except anthropic.RateLimitError:
+        return "⚠️ Rate limit reached. Please wait a moment and try again."
+    except Exception as e:
+        return f"⚠️ Error: {str(e)}"
+
+# ---------------- DISPLAY CHAT ----------------
+chat_container = st.container()
+
+with chat_container:
+    if not st.session_state.chat_history:
+        st.markdown("""
+        <div style="text-align:center; padding: 40px 20px; color: #888;">
+            <div style="font-size: 48px; margin-bottom: 12px;">🇮🇳</div>
+            <div style="font-size: 16px; font-weight: 500; color: #444; margin-bottom: 8px;">Welcome to Election Assistant</div>
+            <div style="font-size: 13px; line-height: 1.7; max-width: 400px; margin: 0 auto;">
+                Ask me anything about Indian elections — voter registration, EVMs, 
+                election laws, or any general question. Use the quick questions 
+                in the sidebar or type below.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        for role, msg in st.session_state.chat_history:
+            if role == "user":
+                st.markdown(f"""
+                <div class="user-msg-wrap">
+                    <div class="user-msg">👤 {msg}</div>
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown(f"""
+                <div class="bot-msg-wrap">
+                    <div class="bot-avatar">EC</div>
+                    <div class="bot-msg">{msg}</div>
+                </div>
+                """, unsafe_allow_html=True)
 
 # ---------------- INPUT ----------------
-user_input = st.text_input("💬 Ask your question:")
+st.markdown("<br>", unsafe_allow_html=True)
 
-# ---------------- RESPONSE ----------------
-if user_input:
-    st.session_state.chat.append(("user", user_input))
+col1, col2 = st.columns([9, 1])
 
-    placeholder = st.empty()
-    placeholder.markdown("🤖 Thinking...")
-    time.sleep(1)
+with col1:
+    default_val = st.session_state.pending_input
+    user_input = st.text_input(
+        "Ask your question",
+        value=default_val,
+        placeholder="Ask about elections or anything else...",
+        label_visibility="collapsed",
+        key="main_input"
+    )
 
-    response = get_ai_response(user_input)
-    translated = translate_text(response)
+with col2:
+    send = st.button("Send ↗", use_container_width=True)
 
-    placeholder.empty()
+# Clear pending input
+if st.session_state.pending_input:
+    st.session_state.pending_input = ""
 
-    st.session_state.chat.append(("bot", translated))
+# ---------------- HANDLE SEND ----------------
+if (send or user_input) and user_input.strip():
+    st.session_state.chat_history.append(("user", user_input.strip()))
 
-# ---------------- LIMIT CHAT ----------------
-if len(st.session_state.chat) > 10:
-    st.session_state.chat = st.session_state.chat[-10:]
+    with st.spinner("🤖 Thinking..."):
+        response = get_ai_response(user_input.strip(), api_key, language)
 
-# ---------------- DISPLAY ----------------
-st.subheader("💬 Conversation")
+    st.session_state.chat_history.append(("bot", response))
 
-for role, msg in st.session_state.chat:
-    if role == "user":
-        st.markdown(f'<div class="user-msg">👤 {msg}</div>', unsafe_allow_html=True)
-    else:
-        st.markdown(f'<div class="bot-msg">🤖 {msg}</div>', unsafe_allow_html=True)
+    # Keep display history to last 30 messages
+    if len(st.session_state.chat_history) > 30:
+        st.session_state.chat_history = st.session_state.chat_history[-30:]
 
-# ---------------- AUTO SCROLL ----------------
-st.markdown("""
-<script>
-window.scrollTo(0, document.body.scrollHeight);
-</script>
-""", unsafe_allow_html=True)
+    st.rerun()
