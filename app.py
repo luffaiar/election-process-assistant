@@ -49,40 +49,28 @@ st.markdown("""
 st.markdown('<div class="header">🗳 Indian Election AI Assistant</div>', unsafe_allow_html=True)
 st.caption("AI + Data + Insights Platform")
 
-# ---------------- LOAD DATA (FIXED) ----------------
+# ---------------- LOAD DATA ----------------
 @st.cache_data
 def load_data():
     file_path = "Indian General Elections 2024.csv"
-
     if not os.path.exists(file_path):
         return None
 
-    try:
-        return pd.read_csv(file_path, encoding="utf-8")
-    except:
+    for enc in ["utf-8", "latin1", "ISO-8859-1"]:
         try:
-            return pd.read_csv(file_path, encoding="latin1")
+            return pd.read_csv(file_path, encoding=enc)
         except:
-            try:
-                return pd.read_csv(file_path, encoding="ISO-8859-1")
-            except Exception as e:
-                st.error(f"❌ Dataset Error: {e}")
-                return None
+            continue
+    return None
 
 df = load_data()
 
-# Upload fallback
 uploaded_file = st.sidebar.file_uploader("📂 Upload CSV", type=["csv"])
 if uploaded_file:
     try:
         df = pd.read_csv(uploaded_file)
-        st.sidebar.success("✅ Dataset loaded!")
-    except Exception as e:
-        st.sidebar.error(f"Error: {e}")
-
-# ---------------- DEBUG ----------------
-if df is not None:
-    st.success("✅ Dataset Loaded Successfully")
+    except:
+        df = None
 
 # ---------------- SESSION ----------------
 if "chat" not in st.session_state:
@@ -97,9 +85,9 @@ def gemini_answer(query):
         prompt = f"""
         You are a helpful AI assistant.
 
-        - Answer like ChatGPT
-        - If election-related → focus on Indian elections
-        - Be clear and structured
+        Answer naturally like ChatGPT.
+        If election-related → focus on Indian elections.
+        Provide clear structured answers.
 
         Question: {query}
         """
@@ -117,11 +105,10 @@ def wiki_answer(query):
 
 def handle_greeting(q):
     if q.lower().strip() in ["hi", "hello", "hey"]:
-        return "👋 Hello! Ask me anything about elections, data insights, or general topics."
+        return "👋 Hello! Ask me anything about elections, insights, or general topics."
     return None
 
 def generate_response(user_input):
-
     greet = handle_greeting(user_input)
     if greet:
         return greet
@@ -134,7 +121,7 @@ def generate_response(user_input):
     if wiki:
         return "🌐 " + wiki
 
-    return "🤖 I'm here to help! Please rephrase your question."
+    return "🤖 Please rephrase your question."
 
 # ---------------- INPUT ----------------
 user_input = st.text_input("💬 Ask your question:")
@@ -151,7 +138,7 @@ if user_input:
     placeholder.empty()
     st.session_state.chat.append(("bot", response))
 
-# ---------------- DISPLAY CHAT ----------------
+# ---------------- CHAT DISPLAY ----------------
 st.subheader("💬 Conversation")
 
 for role, msg in st.session_state.chat[-10:]:
@@ -160,69 +147,83 @@ for role, msg in st.session_state.chat[-10:]:
     else:
         st.markdown(f'<div class="bot-msg">🤖 {msg}</div>', unsafe_allow_html=True)
 
-# ---------------- ANALYTICS ----------------
-st.subheader("📊 Election Analytics")
+# ---------------- DASHBOARD ----------------
+st.subheader("📊 Election Dashboard")
 
 if df is not None:
 
-    # -------- PARTY-WISE --------
     party_col = next((c for c in df.columns if "party" in c.lower()), None)
-
-    if party_col:
-        st.markdown("### 🏛 Party-wise Seats")
-        party_counts = df[party_col].value_counts()
-        st.bar_chart(party_counts)
-
-    # -------- STATE-WISE --------
     state_col = next((c for c in df.columns if "state" in c.lower()), None)
 
+    # KPI CARDS
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🏛 Total Seats", len(df))
+
+    if party_col:
+        col2.metric("🥇 Top Party", df[party_col].value_counts().idxmax())
+
     if state_col:
+        col3.metric("🗺 States", df[state_col].nunique())
+
+    # PIE CHART
+    if party_col:
+        st.markdown("### 🥧 Party Distribution")
+        st.pyplot(df[party_col].value_counts().head(6).plot.pie(autopct='%1.1f%%').figure)
+
+    # STATE ANALYSIS
+    if state_col and party_col:
         st.markdown("### 🗺 State-wise Analysis")
 
         selected_state = st.selectbox("Select State", df[state_col].dropna().unique())
 
         state_data = df[df[state_col] == selected_state]
 
-        st.write(f"📍 Total Seats: {len(state_data)}")
+        st.write(f"📍 Seats: {len(state_data)}")
+        st.bar_chart(state_data[party_col].value_counts())
 
-        if party_col:
-            st.bar_chart(state_data[party_col].value_counts())
-
-    else:
-        st.warning("⚠️ No State column found")
-
-    # -------- AI INSIGHTS --------
+    # AI INSIGHTS
     st.markdown("### 🧠 AI Insights")
 
     if st.button("Generate Insights"):
-        with st.spinner("Analyzing election data..."):
-            try:
-                sample = df.head(20).to_string()
+        with st.spinner("Analyzing..."):
+            sample = df.head(20).to_string()
 
-                prompt = f"""
-                Analyze this Indian election dataset.
+            prompt = f"""
+            Analyze Indian election dataset:
 
-                Provide:
-                - Dominant party
-                - Trends
-                - Summary
+            - Dominant party
+            - Trends
+            - Summary
 
-                Data:
-                {sample}
-                """
+            Data:
+            {sample}
+            """
 
-                res = model.generate_content(prompt)
+            res = model.generate_content(prompt)
 
-                if res and res.text:
-                    st.success(res.text)
-                else:
-                    st.warning("No insights generated")
+            if res and res.text:
+                st.success(res.text)
+            else:
+                st.warning("No insights generated")
 
-            except Exception as e:
-                st.error(f"Error: {e}")
+    # TODAY INFO
+    st.markdown("### 🌐 Today’s Political Info")
+
+    if st.button("Get Latest Info"):
+        with st.spinner("Fetching..."):
+            prompt = """
+            Provide latest political info in India:
+            - Current PM
+            - Ruling party
+            - Recent updates
+            """
+            res = model.generate_content(prompt)
+
+            if res and res.text:
+                st.info(res.text)
 
 else:
-    st.info("📂 Upload or place CSV file to enable analytics")
+    st.info("📂 Upload dataset to enable dashboard")
 
 # ---------------- AUTO SCROLL ----------------
 st.markdown("""
