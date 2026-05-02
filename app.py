@@ -46,7 +46,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="header">🗳 Indian Election AI Assistant</div>', unsafe_allow_html=True)
-st.caption("AI that understands, searches, and explains")
+st.caption("AI-powered retrieval + reasoning system")
 
 # ---------------- SETTINGS ----------------
 language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
@@ -54,7 +54,6 @@ language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
 if st.sidebar.button("🗑 Clear Chat"):
     st.session_state.chat = []
 
-# ---------------- SESSION ----------------
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
@@ -67,77 +66,81 @@ def translate(text):
     except:
         return text
 
-# ---------------- GEMINI PRIMARY ----------------
-def gemini_answer(query):
+# ---------------- STEP 1: UNDERSTAND QUERY ----------------
+def analyze_query(query):
     try:
         prompt = f"""
-        You are an advanced AI assistant.
+        Analyze the user question and extract:
 
-        RULES:
-        - Answer any question clearly
-        - If election-related → focus on Indian system
-        - Provide structured explanation
-        - Use steps if needed
+        - Intent
+        - Key topics
+        - Expected answer type (steps / explanation / definition)
 
         Question: {query}
         """
-
         res = model.generate_content(prompt)
-
-        if res and res.text and len(res.text) > 40:
-            return res.text
+        return res.text if res else query
     except:
-        pass
+        return query
 
-    return None
-
-# ---------------- WIKI FETCH ----------------
-def fetch_wikipedia(query):
+# ---------------- STEP 2: RETRIEVE DATA ----------------
+def retrieve_data(query):
     try:
-        return wikipedia.summary(query, sentences=5)
+        # Add India context for better relevance
+        search_query = query + " India election"
+
+        summary = wikipedia.summary(search_query, sentences=5)
+        return summary
     except:
         return None
 
-# ---------------- AI SUMMARIZER ----------------
-def summarize_with_ai(text, query):
+# ---------------- STEP 3: STRUCTURED AI RESPONSE ----------------
+def generate_structured_answer(query, context):
     try:
         prompt = f"""
-        Summarize the following information clearly and correctly.
+        You are an expert Election Assistant.
 
-        Make it:
-        - Structured
-        - Easy to understand
-        - Relevant to the question
+        Use the following context to answer the question.
+
+        Provide:
+        - Clear explanation
+        - Step-by-step (if applicable)
+        - Focus on Indian system
 
         Question: {query}
 
-        Content:
-        {text}
+        Context:
+        {context}
         """
         res = model.generate_content(prompt)
+        return res.text if res else None
+    except:
+        return None
 
-        if res and res.text:
-            return res.text
+# ---------------- MAIN PIPELINE ----------------
+def rag_pipeline(query):
+
+    # Step 1: Understand
+    analyzed = analyze_query(query)
+
+    # Step 2: Retrieve
+    data = retrieve_data(query)
+
+    # Step 3: Generate answer
+    if data:
+        answer = generate_structured_answer(query, data)
+        if answer:
+            return answer
+
+    # fallback to direct AI
+    try:
+        fallback = model.generate_content(query)
+        if fallback and fallback.text:
+            return fallback.text
     except:
         pass
 
-    return text
-
-# ---------------- MAIN PIPELINE ----------------
-def generate_response(query):
-
-    # 1️⃣ Gemini first
-    ai = gemini_answer(query)
-    if ai:
-        return ai
-
-    # 2️⃣ Wikipedia fetch
-    wiki = fetch_wikipedia(query)
-    if wiki:
-        summarized = summarize_with_ai(wiki, query)
-        return f"🌐 Based on online sources:\n\n{summarized}"
-
-    return "⚠️ Sorry, I couldn't find a proper answer."
+    return "⚠️ Unable to generate answer."
 
 # ---------------- INPUT ----------------
 user_input = st.text_input("💬 Ask your question:")
@@ -150,7 +153,7 @@ if user_input:
     placeholder.markdown("🤖 Thinking...")
     time.sleep(1)
 
-    response = generate_response(user_input)
+    response = rag_pipeline(user_input)
     translated = translate(response)
 
     placeholder.empty()
