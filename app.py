@@ -1,14 +1,13 @@
 import streamlit as st
 import google.generativeai as genai
 import wikipedia
-from deep_translator import GoogleTranslator
 import time
 
 # ---------------- CONFIG ----------------
 genai.configure(api_key="AIzaSyDNDy21ZlSFAPkjRvRdgPfPb1bsjwxafBE")
 model = genai.GenerativeModel("gemini-pro")
 
-st.set_page_config(page_title="Election AI Assistant", layout="wide")
+st.set_page_config(page_title="Indian Election AI Assistant", layout="wide")
 
 # ---------------- UI ----------------
 st.markdown("""
@@ -46,101 +45,69 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="header">🗳 Indian Election AI Assistant</div>', unsafe_allow_html=True)
-st.caption("AI-powered retrieval + reasoning system")
+st.caption("GPT-style assistant with election awareness")
 
-# ---------------- SETTINGS ----------------
-language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
+# ---------------- SESSION ----------------
+if "chat" not in st.session_state:
+    st.session_state.chat = []
 
 if st.sidebar.button("🗑 Clear Chat"):
     st.session_state.chat = []
 
-if "chat" not in st.session_state:
-    st.session_state.chat = []
+# ---------------- GREETING HANDLER ----------------
+def handle_greeting(text):
+    greetings = ["hi", "hello", "hey", "good morning", "good evening"]
+    if text.lower().strip() in greetings:
+        return "👋 Hello! I’m your AI assistant. You can ask me anything, especially about Indian elections, voting process, and politics."
+    return None
 
-# ---------------- TRANSLATION ----------------
-def translate(text):
-    try:
-        if language == "Tamil":
-            return GoogleTranslator(source='auto', target='ta').translate(text)
-        return text
-    except:
-        return text
-
-# ---------------- STEP 1: UNDERSTAND QUERY ----------------
-def analyze_query(query):
+# ---------------- GEMINI RESPONSE ----------------
+def gemini_answer(query):
     try:
         prompt = f"""
-        Analyze the user question and extract:
+        You are a helpful AI assistant.
 
-        - Intent
-        - Key topics
-        - Expected answer type (steps / explanation / definition)
+        - Answer any question naturally like ChatGPT
+        - If the question is about elections, focus on Indian election system
+        - Give clear, structured answers when needed
 
         Question: {query}
         """
+
         res = model.generate_content(prompt)
-        return res.text if res else query
-    except:
-        return query
 
-# ---------------- STEP 2: RETRIEVE DATA ----------------
-def retrieve_data(query):
-    try:
-        # Add India context for better relevance
-        search_query = query + " India election"
-
-        summary = wikipedia.summary(search_query, sentences=5)
-        return summary
+        if res and res.text:
+            return res.text
     except:
         return None
 
-# ---------------- STEP 3: STRUCTURED AI RESPONSE ----------------
-def generate_structured_answer(query, context):
+# ---------------- WIKIPEDIA FALLBACK ----------------
+def wiki_answer(query):
     try:
-        prompt = f"""
-        You are an expert Election Assistant.
-
-        Use the following context to answer the question.
-
-        Provide:
-        - Clear explanation
-        - Step-by-step (if applicable)
-        - Focus on Indian system
-
-        Question: {query}
-
-        Context:
-        {context}
-        """
-        res = model.generate_content(prompt)
-        return res.text if res else None
+        return wikipedia.summary(query + " India", sentences=3)
     except:
         return None
 
 # ---------------- MAIN PIPELINE ----------------
-def rag_pipeline(query):
+def generate_response(user_input):
 
-    # Step 1: Understand
-    analyzed = analyze_query(query)
+    # 1️⃣ Greeting
+    greet = handle_greeting(user_input)
+    if greet:
+        return greet
 
-    # Step 2: Retrieve
-    data = retrieve_data(query)
+    # 2️⃣ Gemini (Primary)
+    ai = gemini_answer(user_input)
+    if ai:
+        return ai
 
-    # Step 3: Generate answer
-    if data:
-        answer = generate_structured_answer(query, data)
-        if answer:
-            return answer
+    # 3️⃣ Wikipedia fallback
+    wiki = wiki_answer(user_input)
+    if wiki:
+        return f"🌐 {wiki}"
 
-    # fallback to direct AI
-    try:
-        fallback = model.generate_content(query)
-        if fallback and fallback.text:
-            return fallback.text
-    except:
-        pass
-
-    return "⚠️ Unable to generate answer."
+    # 4️⃣ Final fallback (NEVER FAIL)
+    return "🤖 I'm here to help! Could you please rephrase your question?"
 
 # ---------------- INPUT ----------------
 user_input = st.text_input("💬 Ask your question:")
@@ -153,16 +120,15 @@ if user_input:
     placeholder.markdown("🤖 Thinking...")
     time.sleep(1)
 
-    response = rag_pipeline(user_input)
-    translated = translate(response)
+    response = generate_response(user_input)
 
     placeholder.empty()
 
-    st.session_state.chat.append(("bot", translated))
+    st.session_state.chat.append(("bot", response))
 
-# ---------------- LIMIT HISTORY ----------------
-if len(st.session_state.chat) > 10:
-    st.session_state.chat = st.session_state.chat[-10:]
+# ---------------- LIMIT CHAT ----------------
+if len(st.session_state.chat) > 12:
+    st.session_state.chat = st.session_state.chat[-12:]
 
 # ---------------- DISPLAY ----------------
 st.subheader("💬 Conversation")
