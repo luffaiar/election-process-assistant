@@ -13,9 +13,7 @@ st.set_page_config(page_title="Election AI Assistant", layout="wide")
 # ---------------- UI ----------------
 st.markdown("""
 <style>
-.stApp {
-    background: linear-gradient(to bottom, #ffffff, #eef2f7);
-}
+.stApp { background: linear-gradient(to bottom, #ffffff, #eef2f7); }
 
 .header {
     text-align:center;
@@ -48,7 +46,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="header">🗳 Indian Election AI Assistant</div>', unsafe_allow_html=True)
-st.caption("AI-powered assistant for elections, governance, and general knowledge")
+st.caption("AI that understands, searches, and explains")
 
 # ---------------- SETTINGS ----------------
 language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
@@ -69,55 +67,77 @@ def translate(text):
     except:
         return text
 
-# ---------------- WIKIPEDIA FALLBACK ----------------
-def wiki_fallback(query):
-    try:
-        summary = wikipedia.summary(query + " India", sentences=3)
-        return f"🌐 **Additional Info:**\n{summary}"
-    except:
-        return None
-
-# ---------------- GEMINI RESPONSE ----------------
-def get_ai_response(user_input):
+# ---------------- GEMINI PRIMARY ----------------
+def gemini_answer(query):
     try:
         prompt = f"""
-        You are an intelligent AI assistant.
+        You are an advanced AI assistant.
 
-        PRIORITY:
-        - If the question is about elections, focus on the Indian election system.
-        - Provide detailed, structured answers.
-        - Explain processes step-by-step where needed.
+        RULES:
+        - Answer any question clearly
+        - If election-related → focus on Indian system
+        - Provide structured explanation
+        - Use steps if needed
 
-        You can also answer general knowledge questions.
-
-        Question: {user_input}
+        Question: {query}
         """
 
         res = model.generate_content(prompt)
 
-        if res and res.text and len(res.text) > 20:
+        if res and res.text and len(res.text) > 40:
             return res.text
-
     except:
         pass
 
     return None
 
-# ---------------- MAIN RESPONSE PIPELINE ----------------
-def generate_response(user_input):
+# ---------------- WIKI FETCH ----------------
+def fetch_wikipedia(query):
+    try:
+        return wikipedia.summary(query, sentences=5)
+    except:
+        return None
 
-    # Step 1: AI
-    ai_answer = get_ai_response(user_input)
+# ---------------- AI SUMMARIZER ----------------
+def summarize_with_ai(text, query):
+    try:
+        prompt = f"""
+        Summarize the following information clearly and correctly.
 
-    if ai_answer:
-        return ai_answer
+        Make it:
+        - Structured
+        - Easy to understand
+        - Relevant to the question
 
-    # Step 2: Wikipedia fallback
-    wiki = wiki_fallback(user_input)
+        Question: {query}
+
+        Content:
+        {text}
+        """
+        res = model.generate_content(prompt)
+
+        if res and res.text:
+            return res.text
+    except:
+        pass
+
+    return text
+
+# ---------------- MAIN PIPELINE ----------------
+def generate_response(query):
+
+    # 1️⃣ Gemini first
+    ai = gemini_answer(query)
+    if ai:
+        return ai
+
+    # 2️⃣ Wikipedia fetch
+    wiki = fetch_wikipedia(query)
     if wiki:
-        return wiki
+        summarized = summarize_with_ai(wiki, query)
+        return f"🌐 Based on online sources:\n\n{summarized}"
 
-    return "⚠️ Sorry, I couldn't find a reliable answer. Please rephrase your question."
+    return "⚠️ Sorry, I couldn't find a proper answer."
 
 # ---------------- INPUT ----------------
 user_input = st.text_input("💬 Ask your question:")
@@ -138,8 +158,8 @@ if user_input:
     st.session_state.chat.append(("bot", translated))
 
 # ---------------- LIMIT HISTORY ----------------
-if len(st.session_state.chat) > 12:
-    st.session_state.chat = st.session_state.chat[-12:]
+if len(st.session_state.chat) > 10:
+    st.session_state.chat = st.session_state.chat[-10:]
 
 # ---------------- DISPLAY ----------------
 st.subheader("💬 Conversation")
