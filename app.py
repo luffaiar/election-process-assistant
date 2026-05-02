@@ -1,7 +1,9 @@
 import streamlit as st
 import google.generativeai as genai
+import pandas as pd
 import wikipedia
 import time
+import os
 
 # ---------------- CONFIG ----------------
 genai.configure(api_key="AIzaSyDNDy21ZlSFAPkjRvRdgPfPb1bsjwxafBE")
@@ -45,7 +47,21 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown('<div class="header">🗳 Indian Election AI Assistant</div>', unsafe_allow_html=True)
-st.caption("GPT-style assistant with election awareness")
+st.caption("AI + Data + Insights Platform")
+
+# ---------------- LOAD DATA ----------------
+@st.cache_data
+def load_data():
+    if os.path.exists("Indian General Elections 2024.csv"):
+        return pd.read_csv("Indian General Elections 2024.csv")
+    return None
+
+df = load_data()
+
+uploaded_file = st.sidebar.file_uploader("📂 Upload CSV", type=["csv"])
+if uploaded_file:
+    df = pd.read_csv(uploaded_file)
+    st.sidebar.success("Dataset loaded!")
 
 # ---------------- SESSION ----------------
 if "chat" not in st.session_state:
@@ -54,65 +70,43 @@ if "chat" not in st.session_state:
 if st.sidebar.button("🗑 Clear Chat"):
     st.session_state.chat = []
 
-# ---------------- GREETING HANDLER ----------------
-def handle_greeting(text):
-    greetings = ["hi", "hello", "hey", "good morning", "good evening"]
-    if text.lower().strip() in greetings:
-        return "👋 Hello! I’m your AI assistant. You can ask me anything, especially about Indian elections, voting process, and politics."
-    return None
-
-# ---------------- GEMINI RESPONSE ----------------
+# ---------------- CHATBOT ----------------
 def gemini_answer(query):
     try:
         prompt = f"""
         You are a helpful AI assistant.
 
-        - Answer any question naturally like ChatGPT
-        - If the question is about elections, focus on Indian election system
-        - Give clear, structured answers when needed
+        Answer naturally like ChatGPT.
+        If election-related, focus on Indian election system.
 
         Question: {query}
         """
-
         res = model.generate_content(prompt)
-
         if res and res.text:
             return res.text
     except:
         return None
 
-# ---------------- WIKIPEDIA FALLBACK ----------------
 def wiki_answer(query):
     try:
         return wikipedia.summary(query + " India", sentences=3)
     except:
         return None
 
-# ---------------- MAIN PIPELINE ----------------
 def generate_response(user_input):
-
-    # 1️⃣ Greeting
-    greet = handle_greeting(user_input)
-    if greet:
-        return greet
-
-    # 2️⃣ Gemini (Primary)
     ai = gemini_answer(user_input)
     if ai:
         return ai
 
-    # 3️⃣ Wikipedia fallback
     wiki = wiki_answer(user_input)
     if wiki:
-        return f"🌐 {wiki}"
+        return "🌐 " + wiki
 
-    # 4️⃣ Final fallback (NEVER FAIL)
-    return "🤖 I'm here to help! Could you please rephrase your question?"
+    return "🤖 Please rephrase your question."
 
-# ---------------- INPUT ----------------
+# ---------------- CHAT INPUT ----------------
 user_input = st.text_input("💬 Ask your question:")
 
-# ---------------- RESPONSE ----------------
 if user_input:
     st.session_state.chat.append(("user", user_input))
 
@@ -123,21 +117,79 @@ if user_input:
     response = generate_response(user_input)
 
     placeholder.empty()
-
     st.session_state.chat.append(("bot", response))
 
-# ---------------- LIMIT CHAT ----------------
-if len(st.session_state.chat) > 12:
-    st.session_state.chat = st.session_state.chat[-12:]
-
-# ---------------- DISPLAY ----------------
+# ---------------- DISPLAY CHAT ----------------
 st.subheader("💬 Conversation")
 
-for role, msg in st.session_state.chat:
+for role, msg in st.session_state.chat[-10:]:
     if role == "user":
         st.markdown(f'<div class="user-msg">👤 {msg}</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="bot-msg">🤖 {msg}</div>', unsafe_allow_html=True)
+
+# ---------------- ANALYTICS ----------------
+st.subheader("📊 Election Analytics")
+
+if df is not None:
+
+    # -------- PARTY-WISE --------
+    if "Party" in df.columns:
+        st.markdown("### 🏛 Party-wise Seats")
+        party_counts = df["Party"].value_counts()
+        st.bar_chart(party_counts)
+
+    # -------- STATE-WISE --------
+    state_column = None
+    for col in df.columns:
+        if "state" in col.lower():
+            state_column = col
+            break
+
+    if state_column:
+        st.markdown("### 🗺 State-wise Analysis")
+
+        selected_state = st.selectbox("Select State", df[state_column].dropna().unique())
+
+        state_data = df[df[state_column] == selected_state]
+
+        st.write(f"📍 Total Seats in {selected_state}: {len(state_data)}")
+
+        if "Party" in df.columns:
+            state_party = state_data["Party"].value_counts()
+            st.bar_chart(state_party)
+
+    else:
+        st.warning("⚠️ No 'State' column found in dataset")
+
+    # -------- AI INSIGHTS --------
+    st.markdown("### 🧠 AI Insights")
+
+    if st.button("Generate Insights"):
+        with st.spinner("Analyzing data..."):
+
+            sample = df.head(20).to_string()
+
+            prompt = f"""
+            Analyze this Indian election dataset and provide insights:
+
+            - Dominant party
+            - State trends
+            - Overall conclusion
+
+            Data:
+            {sample}
+            """
+
+            res = model.generate_content(prompt)
+
+            if res and res.text:
+                st.success(res.text)
+            else:
+                st.warning("Could not generate insights")
+
+else:
+    st.info("📂 Upload or place CSV file to enable analytics")
 
 # ---------------- AUTO SCROLL ----------------
 st.markdown("""
