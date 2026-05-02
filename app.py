@@ -1,344 +1,158 @@
 import streamlit as st
-import anthropic
+import google.generativeai as genai
+import wikipedia
+from deep_translator import GoogleTranslator
 import time
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(
-    page_title="Election Commission Assistant",
-    page_icon="🗳",
-    layout="wide"
-)
+# ---------------- CONFIG ----------------
+genai.configure(api_key="AIzaSyDNDy21ZlSFAPkjRvRdgPfPb1bsjwxafBE")
+model = genai.GenerativeModel("gemini-pro")
 
-# ---------------- STYLES ----------------
+st.set_page_config(page_title="Election AI Assistant", layout="wide")
+
+# ---------------- UI ----------------
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600&display=swap');
-
-* { font-family: 'Sora', sans-serif; }
-
 .stApp {
-    background: #f8f9fc;
+    background: linear-gradient(to bottom, #ffffff, #eef2f7);
 }
 
-.header-box {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    background: white;
-    border-radius: 14px;
-    padding: 16px 20px;
-    margin-bottom: 16px;
-    border: 1px solid #e8eaf0;
-}
-
-.header-icon {
-    width: 48px; height: 48px;
-    background: linear-gradient(135deg, #FF6B00, #FF9933);
-    border-radius: 12px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 24px;
-}
-
-.header-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: #1a2340;
-}
-
-.header-sub {
-    font-size: 13px;
-    color: #888;
-    margin-top: 2px;
-}
-
-.user-msg-wrap {
-    display: flex;
-    justify-content: flex-end;
-    margin: 6px 0;
+.header {
+    text-align:center;
+    padding:15px;
+    border-radius:10px;
+    background: linear-gradient(to right, #ff9933, #ffffff, #138808);
+    font-size:22px;
+    font-weight:bold;
 }
 
 .user-msg {
-    background: #FF6B00;
-    color: white;
-    padding: 10px 16px;
-    border-radius: 16px 16px 4px 16px;
-    max-width: 75%;
-    font-size: 14px;
-    line-height: 1.6;
-}
-
-.bot-msg-wrap {
-    display: flex;
-    justify-content: flex-start;
-    align-items: flex-start;
-    gap: 10px;
-    margin: 6px 0;
-}
-
-.bot-avatar {
-    width: 32px; height: 32px;
-    background: linear-gradient(135deg, #FF6B00, #FF9933);
-    border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 12px;
-    font-weight: 600;
-    color: white;
-    flex-shrink: 0;
-    margin-top: 2px;
+    background:#e8f5e9;
+    padding:10px;
+    border-radius:12px;
+    margin:6px 0;
+    text-align:right;
+    max-width:75%;
+    margin-left:auto;
 }
 
 .bot-msg {
-    background: white;
-    color: #1a2340;
-    padding: 10px 16px;
-    border-radius: 4px 16px 16px 16px;
-    max-width: 75%;
-    font-size: 14px;
-    line-height: 1.6;
-    border: 1px solid #e8eaf0;
-}
-
-.status-bar {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: #888;
-    margin-top: 8px;
-}
-
-.status-dot {
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #138808;
-    display: inline-block;
-}
-
-.chip-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-}
-
-.chip {
-    background: white;
-    border: 1px solid #e8eaf0;
-    border-radius: 20px;
-    padding: 5px 14px;
-    font-size: 12px;
-    color: #555;
-    cursor: pointer;
+    background:#f1f3f4;
+    padding:12px;
+    border-radius:12px;
+    margin:6px 0;
+    text-align:left;
+    max-width:75%;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- HEADER ----------------
-st.markdown("""
-<div class="header-box">
-    <div class="header-icon">🗳</div>
-    <div>
-        <div class="header-title">Election Commission Assistant</div>
-        <div class="header-sub">AI-powered guidance for Indian elections &amp; general queries</div>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown('<div class="header">🗳 Indian Election AI Assistant</div>', unsafe_allow_html=True)
+st.caption("AI-powered assistant for elections, governance, and general knowledge")
 
-# ---------------- SIDEBAR ----------------
-with st.sidebar:
-    st.markdown("### ⚙️ Settings")
+# ---------------- SETTINGS ----------------
+language = st.sidebar.selectbox("🌐 Language", ["English", "Tamil"])
 
-    api_key = st.text_input("Anthropic API Key", type="password", placeholder="sk-ant-...")
+if st.sidebar.button("🗑 Clear Chat"):
+    st.session_state.chat = []
 
-    language = st.selectbox("🌐 Language", ["English", "Tamil (தமிழ்)"])
+# ---------------- SESSION ----------------
+if "chat" not in st.session_state:
+    st.session_state.chat = []
 
-    st.markdown("---")
-    st.markdown("### 💡 Quick Questions")
-    quick_questions = [
-        "How do I register to vote?",
-        "What is EVM and is it safe?",
-        "What is Model Code of Conduct?",
-        "How are election winners decided?",
-        "What is NOTA?",
-        "How to apply for Voter ID card?",
-        "What is VVPAT?",
-        "Can NRIs vote in Indian elections?",
-    ]
-
-    for q in quick_questions:
-        if st.button(q, use_container_width=True, key=f"chip_{q}"):
-            st.session_state.pending_input = q
-
-    st.markdown("---")
-    if st.button("🗑 Clear Chat", use_container_width=True):
-        st.session_state.chat_history = []
-        st.session_state.api_messages = []
-        st.rerun()
-
-    st.markdown("""
-    <div class="status-bar">
-        <span class="status-dot"></span>
-        Claude AI · Powered by Anthropic
-    </div>
-    """, unsafe_allow_html=True)
-
-# ---------------- SESSION STATE ----------------
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-if "api_messages" not in st.session_state:
-    st.session_state.api_messages = []
-
-if "pending_input" not in st.session_state:
-    st.session_state.pending_input = ""
-
-# ---------------- SYSTEM PROMPT ----------------
-def get_system_prompt(language):
-    lang_instruction = (
-        "IMPORTANT: You MUST respond entirely in Tamil (தமிழ்). Use clear, simple Tamil language throughout."
-        if "Tamil" in language
-        else "Respond in clear, well-structured English."
-    )
-
-    return f"""You are a knowledgeable, friendly assistant specializing in the Indian Election Commission and Indian democracy. {lang_instruction}
-
-Your deep expertise covers:
-- Voter registration (how to register, update details, check status on voterportal.eci.gov.in)
-- Electronic Voting Machines (EVMs) and VVPAT (Voter Verifiable Paper Audit Trail) systems
-- Election schedules, phases, counting, and results
-- Model Code of Conduct (MCC) — rules and enforcement
-- Political parties, candidates, nominations, and campaign rules
-- Lok Sabha and Rajya Sabha elections — differences, terms, seats
-- State Legislative Assembly (Vidhan Sabha) elections
-- Election Commission of India (ECI) — powers, structure, Chief Election Commissioner
-- Voting rights, procedures, and the voting process on election day
-- NOTA (None of the Above) — what it means and implications
-- Postal ballot and proxy voting for NRIs, armed forces, and senior citizens
-- Election laws — Representation of the People Act 1951 & 1950
-- Delimitation of constituencies
-- Election funding, expenditure limits, and affidavit disclosures
-- Booth-level officers, returning officers, and election machinery
-- Election results and dispute resolution (Election Petitions)
-
-You can also answer ANY general knowledge, science, history, current affairs, or everyday question with equal accuracy.
-
-Formatting rules:
-- Use **bold** for key terms and headings
-- Use bullet points for lists
-- Keep answers clear, structured, and appropriately detailed
-- For step-by-step processes, number the steps
-- Be concise but thorough — never vague"""
-
-# ---------------- AI RESPONSE ----------------
-def get_ai_response(user_input, api_key, language):
-    if not api_key:
-        return "⚠️ Please enter your Anthropic API key in the sidebar to use this assistant."
-
+# ---------------- TRANSLATION ----------------
+def translate(text):
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        if language == "Tamil":
+            return GoogleTranslator(source='auto', target='ta').translate(text)
+        return text
+    except:
+        return text
 
-        # Add user message to API history
-        st.session_state.api_messages.append({
-            "role": "user",
-            "content": user_input
-        })
+# ---------------- WIKIPEDIA FALLBACK ----------------
+def wiki_fallback(query):
+    try:
+        summary = wikipedia.summary(query + " India", sentences=3)
+        return f"🌐 **Additional Info:**\n{summary}"
+    except:
+        return None
 
-        # Keep last 20 messages for context
-        messages_to_send = st.session_state.api_messages[-20:]
+# ---------------- GEMINI RESPONSE ----------------
+def get_ai_response(user_input):
+    try:
+        prompt = f"""
+        You are an intelligent AI assistant.
 
-        response = client.messages.create(
-            model="claude-opus-4-5",
-            max_tokens=1024,
-            system=get_system_prompt(language),
-            messages=messages_to_send
-        )
+        PRIORITY:
+        - If the question is about elections, focus on the Indian election system.
+        - Provide detailed, structured answers.
+        - Explain processes step-by-step where needed.
 
-        reply = response.content[0].text
+        You can also answer general knowledge questions.
 
-        # Add assistant reply to API history
-        st.session_state.api_messages.append({
-            "role": "assistant",
-            "content": reply
-        })
+        Question: {user_input}
+        """
 
-        # Keep API history trimmed
-        if len(st.session_state.api_messages) > 40:
-            st.session_state.api_messages = st.session_state.api_messages[-40:]
+        res = model.generate_content(prompt)
 
-        return reply
+        if res and res.text and len(res.text) > 20:
+            return res.text
 
-    except anthropic.AuthenticationError:
-        return "⚠️ Invalid API key. Please check your Anthropic API key in the sidebar."
-    except anthropic.RateLimitError:
-        return "⚠️ Rate limit reached. Please wait a moment and try again."
-    except Exception as e:
-        return f"⚠️ Error: {str(e)}"
+    except:
+        pass
 
-# ---------------- DISPLAY CHAT ----------------
-chat_container = st.container()
+    return None
 
-with chat_container:
-    if not st.session_state.chat_history:
-        st.markdown("""
-        <div style="text-align:center; padding: 40px 20px; color: #888;">
-            <div style="font-size: 48px; margin-bottom: 12px;">🇮🇳</div>
-            <div style="font-size: 16px; font-weight: 500; color: #444; margin-bottom: 8px;">Welcome to Election Assistant</div>
-            <div style="font-size: 13px; line-height: 1.7; max-width: 400px; margin: 0 auto;">
-                Ask me anything about Indian elections — voter registration, EVMs, 
-                election laws, or any general question. Use the quick questions 
-                in the sidebar or type below.
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    else:
-        for role, msg in st.session_state.chat_history:
-            if role == "user":
-                st.markdown(f"""
-                <div class="user-msg-wrap">
-                    <div class="user-msg">👤 {msg}</div>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                st.markdown(f"""
-                <div class="bot-msg-wrap">
-                    <div class="bot-avatar">EC</div>
-                    <div class="bot-msg">{msg}</div>
-                </div>
-                """, unsafe_allow_html=True)
+# ---------------- MAIN RESPONSE PIPELINE ----------------
+def generate_response(user_input):
+
+    # Step 1: AI
+    ai_answer = get_ai_response(user_input)
+
+    if ai_answer:
+        return ai_answer
+
+    # Step 2: Wikipedia fallback
+    wiki = wiki_fallback(user_input)
+    if wiki:
+        return wiki
+
+    return "⚠️ Sorry, I couldn't find a reliable answer. Please rephrase your question."
 
 # ---------------- INPUT ----------------
-st.markdown("<br>", unsafe_allow_html=True)
+user_input = st.text_input("💬 Ask your question:")
 
-col1, col2 = st.columns([9, 1])
+# ---------------- RESPONSE ----------------
+if user_input:
+    st.session_state.chat.append(("user", user_input))
 
-with col1:
-    default_val = st.session_state.pending_input
-    user_input = st.text_input(
-        "Ask your question",
-        value=default_val,
-        placeholder="Ask about elections or anything else...",
-        label_visibility="collapsed",
-        key="main_input"
-    )
+    placeholder = st.empty()
+    placeholder.markdown("🤖 Thinking...")
+    time.sleep(1)
 
-with col2:
-    send = st.button("Send ↗", use_container_width=True)
+    response = generate_response(user_input)
+    translated = translate(response)
 
-# Clear pending input
-if st.session_state.pending_input:
-    st.session_state.pending_input = ""
+    placeholder.empty()
 
-# ---------------- HANDLE SEND ----------------
-if (send or user_input) and user_input.strip():
-    st.session_state.chat_history.append(("user", user_input.strip()))
+    st.session_state.chat.append(("bot", translated))
 
-    with st.spinner("🤖 Thinking..."):
-        response = get_ai_response(user_input.strip(), api_key, language)
+# ---------------- LIMIT HISTORY ----------------
+if len(st.session_state.chat) > 12:
+    st.session_state.chat = st.session_state.chat[-12:]
 
-    st.session_state.chat_history.append(("bot", response))
+# ---------------- DISPLAY ----------------
+st.subheader("💬 Conversation")
 
-    # Keep display history to last 30 messages
-    if len(st.session_state.chat_history) > 30:
-        st.session_state.chat_history = st.session_state.chat_history[-30:]
+for role, msg in st.session_state.chat:
+    if role == "user":
+        st.markdown(f'<div class="user-msg">👤 {msg}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="bot-msg">🤖 {msg}</div>', unsafe_allow_html=True)
 
-    st.rerun()
+# ---------------- AUTO SCROLL ----------------
+st.markdown("""
+<script>
+window.scrollTo(0, document.body.scrollHeight);
+</script>
+""", unsafe_allow_html=True)
